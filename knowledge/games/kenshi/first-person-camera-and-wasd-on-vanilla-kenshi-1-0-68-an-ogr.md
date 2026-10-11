@@ -44,8 +44,11 @@ tags:
 
 ## Setup
 - Kenshi 1.0.68 x64 from Steam, Linux (CachyOS, Hyprland/Wayland), Proton 11.0-100. No mods, no RE_Kenshi.
-- `um scan` calls the game ".NET" because the folder also holds `forgotten construction set.exe`. The game
-  (`kenshi_x64.exe`) is native C++ built with MSVC 2010 (`MSVCR100`, `MSVCP100`, `mfc100u`).
+- The game (`kenshi_x64.exe`) is native C++ built with MSVC 2010 (`MSVCR100`, `MSVCP100`, `mfc100u`); only
+  the editor, `forgotten construction set.exe`, is .NET (older `um scan` builds reported the whole game as
+  .NET because of it). For the data/FCS routes, load order and the RE_Kenshi route on 1.0.65, see the
+  companion note [`kenshi-1-0-65-native-ogre-recon.md`](kenshi-1-0-65-native-ogre-recon.md); this note
+  covers a native plugin on vanilla 1.0.68 without RE_Kenshi.
 - Engine DLLs next to the exe: `OgreMain_x64.dll` (OGRE 2.0.0 "Tindalos", 9333 exports, patched by Lo-Fi),
   `RenderSystem_Direct3D11_x64.dll`, `MyGUIEngine_x64.dll`, `OIS64.dll`, PhysX, Havok.
 - Saves live in the Proton prefix: `compatdata/233860/pfx/drive_c/users/steamuser/AppData/Local/kenshi/save`
