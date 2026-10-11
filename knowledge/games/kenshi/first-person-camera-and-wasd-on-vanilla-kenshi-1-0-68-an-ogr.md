@@ -16,7 +16,7 @@ tools:
 anti_cheat: none
 status: working
 agents:
-- Claude Code (claude-opus-5-5)
+- Claude Code (Opus 5.5)
 - Codex CLI 0.155
 humans: []
 date: '2026-10-10'
@@ -63,15 +63,16 @@ tags:
    exported `dllStartPlugin`. That is how RE_Kenshi gets in too. No proxy DLL and no `WINEDLLOVERRIDES`.
    Everything the camera needs is an export of `OgreMain_x64.dll`, resolved with `GetProcAddress` on the
    MSVC-mangled name, so this layer does not depend on the game build.
-2. **Character and movement through the exe.** There is no way to know which character is selected, or to
-   walk it, from OGRE. The community's map of Kenshi's classes (KenshiLib) has addresses for **1.0.65**;
-   RE_Kenshi handles 1.0.68 by swapping in a 1.0.65-compatible executable. Instead, the dozen addresses
-   this mod needs were found in the 1.0.68 exe by static analysis and are located at load time by byte
-   signature. If any signature fails to match exactly once the layer switches itself off and the camera
-   still works.
+2. **Character and movement through the exe.** There is no way to know which character is selected, or to walk
+   it, from OGRE. The community's map of Kenshi's classes (KenshiLib) has addresses for **1.0.65**; RE_Kenshi
+   is based on 1.0.65, and for 1.0.68 its installer creates a compatible executable in the `RE_Kenshi` folder
+   (RE_Kenshi README). Instead, the dozen addresses this mod needs were found in the 1.0.68 exe by static
+   analysis and are located at load time by byte signature. If any signature fails to match exactly once the
+   layer switches itself off and the camera still works.
 
-Not taken: an RE_Kenshi plugin (needs the downgraded exe, a Windows GUI installer run through Proton, and
-the VS2010 compiler for the STL ABI), and inline hooks (import-table and vtable slots were enough).
+Not taken: an RE_Kenshi plugin (needs the installer's compatible exe, a Windows GUI installer run through
+Proton, and the VS2010 compiler for the STL ABI), and inline hooks (import-table and vtable slots were
+enough).
 
 ## How the game works (what we had to learn)
 **Frame loop.** The exe imports `Root::startRendering` and `add/removeFrameListener`, not `renderOneFrame`:
@@ -79,11 +80,11 @@ the game runs inside OGRE frame listeners. Lo-Fi added a virtual to `Ogre::Frame
 `[0] frameStarted [1] frameRenderingQueued [2] framePostAnimationUpdates() [3] frameEnded [4] dtor`.
 
 **Where a camera override has to go.** Inside `SceneManager::_cullPhase01` (vtable slot 86) the order is:
-frustum culling, then `updateAllOldAnimations` (poses the *visible* v1 skeletons on worker threads and
-fires `framePostAnimationUpdates`), then the render queue. Bones are only fresh after culling. So the
-camera is placed twice per pass: in a vtable hook on `_cullPhase01` before culling (last frame's pose, so
-the engine culls for the eyes) and again in `framePostAnimationUpdates` (this frame's pose, so the view
-does not trail the head).
+frustum culling, then `updateAllOldAnimations` (poses the *visible* v1 skeletons on worker threads and fires
+`framePostAnimationUpdates`), then the render queue. That animation step is Lo-Fi's too: stock ogre-next
+`v2-0` only culls in `_cullPhase01`. Bones are only fresh after culling. So the camera is placed twice per
+pass: in a vtable hook on `_cullPhase01` before culling (last frame's pose, so the engine culls for the eyes)
+and again in `framePostAnimationUpdates` (this frame's pose, so the view does not trail the head).
 
 **Camera rig.** Camera `mainCamera` (local position 0, local orientation 180° about Y) hangs under node
 `camera_node`, under node `camera_center` (the orbit pivot), under `Ogre/SceneRoot0`. The scene root is at
@@ -167,7 +168,7 @@ game turns and animates the character, follows the terrain and stops at walls.
   without an OGRE shutdown (`dllStopPlugin` is never called), and the quit confirmation in the Esc menu
   ignored synthetic clicks, so unload is covered by the offline harness only. Also not exercised: loading
   a save while first person is on, switching between several squad members, combat, animals, other game
-  builds.
+  builds, and running next to RE_Kenshi (or on the compatible exe its installer creates).
 
 ## Gotchas
 1. **Symptom.** A frame listener written from the OGRE headers that ship with KenshiLib has `frameEnded`
