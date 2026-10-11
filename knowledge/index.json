@@ -876,6 +876,45 @@
   ]
  },
  {
+  "path": "games/kenshi/first-person-camera-and-wasd-on-vanilla-kenshi-1-0-68-an-ogr.md",
+  "kind": "game",
+  "title": "First-person camera and WASD on vanilla Kenshi 1.0.68: an OGRE plugin plus signature-scanned game internals",
+  "game": "Kenshi",
+  "games_also": [],
+  "game_version": "1.0.68 x64 (Newland), Steam build 13871665, kenshi_x64.exe md5 8a03c256f0da1555d9cceb939b41530a",
+  "platform": "proton",
+  "engine": "native",
+  "route": "native-hook",
+  "tools": [
+   "clang + lld-link + llvm-dlltool (freestanding x86_64-pc-windows-msvc DLL, no Windows SDK)",
+   "Wine 11.18 (offline harness), Proton 11.0",
+   "objdump, winedump",
+   "KenshiLib headers (reference only)",
+   "python-evdev over /dev/uinput (test input)"
+  ],
+  "anti_cheat": "none",
+  "status": "working",
+  "agents": [
+   "Claude Code (claude-opus-5-5)",
+   "Codex CLI 0.155"
+  ],
+  "humans": [],
+  "date": "2026-10-10",
+  "links": [
+   "https://github.com/BFrizzleFoShizzle/KenshiLib",
+   "https://github.com/BFrizzleFoShizzle/RE_Kenshi"
+  ],
+  "tags": [
+   "ogre",
+   "first-person",
+   "camera",
+   "signature-scan",
+   "rtti",
+   "proton",
+   "two-agents"
+  ]
+ },
+ {
   "path": "games/left-4-dead/left-4-dead-infected-and-tank-in-minecraft.md",
   "kind": "game",
   "title": "Left 4 Dead's common infected (19 looks) and Tank as animated Minecraft mobs",
