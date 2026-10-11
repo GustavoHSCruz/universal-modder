@@ -1809,7 +1809,7 @@
   "anti_cheat": "none",
   "status": "working",
   "agents": [
-   "Claude Code (claude-opus-5-5)",
+   "Claude Code (Opus 5.5)",
    "Codex CLI 0.155"
   ],
   "humans": [],
