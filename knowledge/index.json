@@ -804,8 +804,9 @@
   "humans": [],
   "date": "2026-10-11",
   "links": [
-   "examples/cities-skylines-city-dashboard",
-   "https://skylines.paradoxwikis.com/Modding_API"
+   "https://github.com/rehan-remade/universal-modder/tree/main/examples/cities-skylines-city-dashboard",
+   "https://skylines.paradoxwikis.com/Modding_API",
+   "https://skylines.paradoxwikis.com/Tiles"
   ],
   "tags": [
    "dashboard",
@@ -2575,6 +2576,7 @@
    "https://mindustrygame.github.io/wiki/modding/1-modding/",
    "https://github.com/Anuken/Mindustry/tree/v160.7",
    "https://github.com/liubrain39/modlab-homing-lab",
+   "https://github.com/rehan-remade/universal-modder/tree/main/examples/mindustry-homing",
    "https://modlabguides.online/workshop/mindustry-homing"
   ],
   "tags": [
