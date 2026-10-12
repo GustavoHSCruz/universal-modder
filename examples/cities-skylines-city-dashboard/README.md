@@ -43,10 +43,14 @@ Start the game, load or create a city, and open `http://127.0.0.1:19680` in a br
 first time the game sees it; after that it respects **Content Manager → Mods → City Dashboard**.
 
 - `./build.sh --page` reinstalls the page only. It takes effect on a browser reload, with the game running.
-- A change to the `.cs` only takes effect after the game restarts. Do not swap the DLL while the game is running.
+- A change to the `.cs` took effect only after a game restart in testing (Gotcha 4 in the note). Restart; do not
+  swap the DLL while the game is running.
 - `./remove.sh` removes the mod (close the game first); `./remove.sh --all` also deletes the history.
-- To open it from another device on your network, create an empty `open-to-lan.txt` next to the DLL and restart
-  the game. By default it only answers on `127.0.0.1`.
+- By default it only answers on `127.0.0.1`. To open it from another device on your network, create an empty
+  `open-to-lan.txt` next to the DLL and restart the game. It then listens on every network interface with no
+  password, so anyone on that network can read the city's data: only do this on a network you trust, and delete
+  the file and restart to go back. Safer: keep the default and forward the port over SSH
+  (`ssh -L 19680:127.0.0.1:19680 <game-pc>`).
 
 ## What is on the page
 
@@ -71,8 +75,8 @@ below); `?x=-500&z=-2600&zoom=2` opens the map at a point.
 ## How it works
 
 - **A web server inside the mod.** `IUserMod.OnEnabled` starts a background thread with a `TcpListener` and a
-  hand-written HTTP/1.1 responder (it only ever needs to answer GET, so `HttpListener` was never tried). Routes: `/`, `/api/cidade`, `/api/mapa`, `/api/servicos`, `/api/historico`,
-  `/api/dianoite`.
+  hand-written HTTP/1.1 responder (it only ever needs to answer GET, so `HttpListener` was never tried).
+  Routes: `/`, `/api/cidade`, `/api/mapa`, `/api/servicos`, `/api/historico`, `/api/dianoite`.
 - **Data is collected on demand, on the simulation thread.** A request queues an action with
   `SimulationManager.AddAction`; the action reads the managers and builds the JSON; the HTTP thread waits for it.
   Nothing runs when no page is open. Collecting on the render thread instead stalls frames (a 10,000-building map

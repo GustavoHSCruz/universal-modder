@@ -14,7 +14,7 @@ agents:
 - Claude Code (Opus 5.5)
 humans: []
 date: '2026-10-11'
-links: ['examples/cities-skylines-city-dashboard', 'https://skylines.paradoxwikis.com/Modding_API']
+links: ['https://github.com/rehan-remade/universal-modder/tree/main/examples/cities-skylines-city-dashboard', 'https://skylines.paradoxwikis.com/Modding_API', 'https://skylines.paradoxwikis.com/Tiles']
 tags: [dashboard, http-server, read-only, telemetry, simulation-thread, linux, mcs, i18n, mock-server, crash-on-save]
 ---
 # Read-only live city dashboard for Cities: Skylines 1: an HTTP server inside a C# mod, built on Linux with mcs
@@ -44,6 +44,8 @@ every DLL in a mod folder. Nothing else is needed for a read-only tool: every ma
 - Not Harmony: nothing is patched. The mod only reads.
 - The browser is the UI on purpose. In-game UI means the game's own UI framework; a web page can be built and
   tested with no game running (see Verification).
+- The editors, the `.crp`/`.locale` containers and CS2 are covered in
+  [the API and containers note](cities-skylines-modding-api-and-container-formats.md).
 
 ## How the game works (what we had to learn)
 ### Mod loading
@@ -53,14 +55,16 @@ every DLL in a mod folder. Nothing else is needed for a read-only tool: every ma
   first `Update` set its own `PluginInfo.isEnabled = true`. That value is persisted by the game.
 - `PluginManager.FindPluginInfo(assembly)` only returns **enabled** plugins. To find yourself while disabled,
   walk `GetPluginsInfo()` and test `ContainsAssembly`. `PluginInfo.modPath` is the mod's folder.
-- Assemblies are loaded from bytes, not mapped from the file. Overwriting the DLL in place while the game runs
-  changed nothing every time it was tried (no reload, no log line); the new code ran only after a restart.
+- Assemblies are loaded from bytes, not mapped from the file. Overwriting the DLL in place while the game ran
+  changed nothing every time it was tried here (no reload, no log line); the new code ran only after a restart.
+  The game does reload mods while running in other setups: see Gotcha 4.
 
 ### Threads
 - The **main thread** renders and runs `MonoBehaviour.Update`. The **simulation thread** owns the city data.
   There are also water, path-finding and audio threads.
 - `SimulationManager.AddAction(Action)` queues work for the simulation thread. Queued actions run at the top of
-  every simulation step **even while the game is paused**.
+  every simulation step **even while the game is paused**. The official `ICities` equivalent is
+  `IThreading.QueueSimulationThread(Action)` (and `QueueMainThread` for the other direction).
 - Reading managers from the main thread works but costs frames. Collecting a 9,600-building, 4,300-segment map
   into 1.6 MB of JSON took about 80 ms on the simulation thread; on the main thread that is a visible hitch
   every refresh.
@@ -88,8 +92,11 @@ every DLL in a mod folder. Nothing else is needed for a read-only tool: every ma
 - Buildings: position, angle, and `Width`/`Length` in 8 m cells give the footprint. `m_problems.ToString()`
   lists the problem names (`Garbage`, `Death`, `NoGoods`, …) plus `MajorProblem`/`FatalProblem`.
   `BuildingAI.GetLocalizedStats` returns the same text the building's info panel shows ("Students: 232 / 910").
-- Roads: a segment has two nodes and `m_middlePosition`, a point **on** the curve. For a quadratic Bézier
-  the control point is `2·M − (A+B)/2`. `m_trafficDensity` is 0–100. `NetInfo.m_halfWidth` gives the width.
+- Roads: a segment has two nodes and `m_middlePosition`, a point **on** the curve. The dashboard draws each
+  segment as the quadratic Bézier through that point, whose control point is `2·M − (A+B)/2`. That's an
+  approximation: the game's own curve is a cubic `Bezier3` from the node positions, whose inner points
+  `NetSegment.CalculateMiddlePoints` derives from the segment's `m_startDirection`/`m_endDirection` (TM:PE's
+  `GeometryUtil` does exactly this). `m_trafficDensity` is 0–100. `NetInfo.m_halfWidth` gives the width.
 - Service vehicles: each building keeps a linked list of its own vehicles; the AI class has a count field
   (ambulances, hearses, fire trucks, police cars, garbage trucks, maintenance trucks). Available vehicles are
   that count scaled by the building's production rate.
@@ -97,8 +104,12 @@ every DLL in a mod folder. Nothing else is needed for a read-only tool: every ma
   from 100 to 150% the gain tapers (150% → 125%), and upkeep follows the budget linearly. Inverting this turns
   "peak usage was 71%" into "this budget can drop to 95%".
 - Day and night: `SimulationManager.m_isNightTime`, `m_currentDayTimeHour`, `m_enableDayNight`. Night is before
-  05:00 and after 20:00, so 9 of 24 hours. Every service has a day budget and a night budget.
-- Map geometry: 17.28 km across, tiles of 1,920 m, 5×5 purchasable (9×9 with the 81 Tiles mod).
+  05:00 and after 20:00, so 9 of 24 hours. Every service has a day budget and a night budget. Those hours come
+  from the static `SimulationManager.SUNRISE_HOUR` / `SUNSET_HOUR`, which time mods such as Real Time and Rush
+  Hour change; read them (or `m_isNightTime`) rather than hard-coding the hours.
+- Map geometry: 17.28 km across, 9×9 tiles of 1,920 m. The base game lets the player buy 9 of them (the
+  official wiki's Tiles page); tile borders are drawn for the middle 5×5, and mods raise the limit to 25 or 81
+  (81 Tiles 2 was installed here). `GameAreaManager.MaxAreaCount` gives the current limit.
 - Engine limits are plain buffer sizes: 49,152 buildings, 36,864 net segments, 32,768 nodes, 16,384 active
   vehicles, 65,536 citizen instances, 262,144 trees, 256 transport lines, 128 districts. Each manager exposes
   the current count next to the buffer.
@@ -140,34 +151,40 @@ These came from a 128,000-inhabitant city played the same day, then confirmed in
 1. **The game aborted one second into a save, with the mod installed, and a city was lost.** The process got
    SIGABRT, the temp `.ccs` stayed at 0 bytes, and the city had never been saved before. **Cause:** unknown.
    Three scripted save runs with the same DLL and a run of the newer build did not reproduce it; those ran the
-   binary directly while
-   the crash happened in a session started through the Paradox launcher, so the mod is not cleared. The
-   evidence was lost because the player reopened the game, which truncates `Player.log`. **Fix (what to do
-   instead):** before installing any mod for someone, back up their saves and make them save the current city;
-   test load, play, **save** and quit yourself, started the same way the player starts the game; and when a
-   crash is reported, first run `coredumpctl list` and copy `Player.log` before anything relaunches the game.
+   binary directly while the crash happened in a session started through the Paradox launcher, so the mod is
+   not cleared. The evidence was lost because the player reopened the game, which truncates `Player.log`.
+   **Fix (what to do instead):** before installing any mod for someone, back up their saves and make them save
+   the current city; test load, play, **save** and quit yourself, started the same way the player starts the
+   game; and when a crash is reported, first run `coredumpctl list` and copy `Player.log` before anything
+   relaunches the game.
 2. **Starting a second city in the same session breaks the game.** Loading or creating another city without
    quitting threw `Argument is out of range` while deserializing game-area data, then the simulation logged a
-   null-reference on every step, and quitting hung at `Waiting for simulation to quit...`. **Cause:** stale state
-   in other mods' patches across loads (81 Tiles 2 and TM:PE were loaded); it reproduces with this mod
-   removed. **Fix:** one city per process. When scripting tests, restart the game for every load.
+   null-reference on every step, and quitting hung at `Waiting for simulation to quit...`. **Cause:** not this
+   mod: it reproduces with this mod removed. Most likely stale state in other mods' patches across loads (81
+   Tiles 2, which changes the game-area data, and TM:PE were loaded); a run without them wasn't tried.
+   **Fix:** one city per process. When scripting tests, restart the game for every load.
 3. **The mod's server never started on a fresh install.** **Cause:** the mod was disabled, and the self-enable
    code looked itself up with `FindPluginInfo`, which skips disabled plugins. **Fix:** iterate `GetPluginsInfo()`
    and match with `ContainsAssembly`.
-4. **Replacing the DLL while the game runs does nothing, silently.** **Cause:** assemblies are loaded from bytes
-   at startup. **Fix:** restart to test C# changes; keep anything you iterate on (here, the whole page) in files
-   the mod reads at request time.
+4. **Overwriting the DLL in place while the game ran did nothing, silently.** **Cause:** not established. The
+   game can reload mods while running: the official Modding API page says extensions' `OnCreated`/`OnReleased`
+   also run "when recompiling a mod while the game is running", and TM:PE handles an in-game hot reload. Other
+   mods' build scripts trigger it by deleting the DLL and then copying the new one (NetworkAnarchy's `.csproj`,
+   "trigger hot reload"), and many give every build a new version (`[assembly: AssemblyVersion("1.0.*")]`).
+   Here the DLL was overwritten in place, and with no `AssemblyVersion` every build is 0.0.0.0; whether either
+   change makes the reload work wasn't tested. **Fix:** restart to test C# changes (given Gotcha 1, the safer
+   choice anyway); keep anything you iterate on (here, the whole page) in files the mod reads at request time.
 5. **Polling the map made the game stutter.** **Cause:** collection ran on the main thread through a
    `MonoBehaviour` queue. **Fix:** queue it with `SimulationManager.AddAction`, keep the main-thread queue only
    as a fallback after a timeout, and let the client stretch its interval to a multiple of the measured cost.
 6. **`Player.log` from the crash was gone.** **Cause:** Unity truncates it on every start. **Fix:** copy it
    first. The example's author now keeps a watcher that copies the log every 15 s while the game runs.
-7. **A custom window-close shortcut did not close the frozen game.** **Cause:** most likely the process had already aborted
-   and systemd-coredump was writing a multi-gigabyte dump (about a minute, by its own log); the window stays on
-   screen meanwhile. **Fix:** wait for the dump, then read `coredumpctl info <pid>`.
+7. **A custom window-close shortcut did not close the frozen game.** **Cause:** most likely the process had
+   already aborted and systemd-coredump was writing a multi-gigabyte dump (about a minute, by its own log); the
+   window stays on screen meanwhile. **Fix:** wait for the dump, then read `coredumpctl info <pid>`.
 8. **Core dumps of the game were useless for a stack.** **Cause:** the game runs inside Steam's runtime
-   container, so the library paths recorded in the dump do not exist on the host and gdb could not unwind it. **Fix:**
-   rely on `Player.log`, which gets the managed stack when the runtime dies in the open.
+   container, so the library paths recorded in the dump do not exist on the host and gdb could not unwind it.
+   **Fix:** rely on `Player.log`, which gets the managed stack when the runtime dies in the open.
 9. **Translating the UI broke the script.** **Cause:** English text with apostrophes (`residents' health`) went
    into single-quoted strings. **Fix:** escape the quote character of the literal when substituting text.
 10. **A word was both a JSON key and on-screen text**, so translating by text would have renamed the key.
@@ -194,3 +211,5 @@ another mod). Roughly 15 game restarts for C# changes; page changes needed none.
   Streaming the response or reusing buffers would remove the question.
 - A history with more than 14 columns (utilities, traffic, sick, dead) needs a CSV format that tolerates old rows.
 - Windows and macOS: the code uses nothing Linux-specific, but nobody has run it there.
+- Does deleting the DLL and copying the new one, or a new `AssemblyVersion` per build, make this build reload
+  the mod while running (Gotcha 4)?
